@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: test-cni
+spec:
+  selector:
+    matchLabels:
+      app: test-cni
+  template:
+    metadata:
+      labels:
+        app: test-cni
+    spec:
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: test-cni
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      containers:
+        - image: test-cni
+          name: test-cni
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /etc/cni/net.d
+              name: cni-conf-dir
+            - mountPath: /opt/cni/bin
+              name: cni-bin-dir
+      volumes:
+        - hostPath:
+            path: /etc/cni/net.d
+            type: ""
+          name: cni-conf-dir
+        - hostPath:
+            path: /opt/cni/bin
+            type: ""
+          name: cni-bin-dir
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-cni
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-cni
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-cni
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: test-cni
+subjects:
+  - kind: ServiceAccount
+    name: test-cni
+    namespace: default
